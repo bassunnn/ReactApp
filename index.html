@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>React Password Generator (no build)</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background:#f7f7f7; }
+    .card { background:white; padding:16px; border-radius:8px; max-width:520px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+    input[type=text] { width:100%; padding:8px; margin-bottom:8px; box-sizing:border-box; }
+    .controls { display:flex; gap:8px; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Генератор паролей</h2>
+    <div id="root"></div>
+  </div>
+
+  <!-- Inline JSX so browsers don't block external type="text/babel" files -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [length, setLength] = useState(16);
+      const [useLower, setUseLower] = useState(true);
+      const [useUpper, setUseUpper] = useState(true);
+      const [useNumbers, setUseNumbers] = useState(true);
+      const [useSymbols, setUseSymbols] = useState(true);
+      const [password, setPassword] = useState('');
+      const [copied, setCopied] = useState(false);
+
+      const LOWER = "abcdefghijklmnopqrstuvwxyz";
+      const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const NUMS = "0123456789";
+      const SYMS = "!@#$%&*()-_=+[]{};:,.<>?/\\|~`";
+
+      function rand(max) {
+        const arr = new Uint32Array(1);
+        window.crypto.getRandomValues(arr);
+        return arr[0] % max;
+      }
+
+      function generate() {
+        const pools = [];
+        if (useLower) pools.push(LOWER);
+        if (useUpper) pools.push(UPPER);
+        if (useNumbers) pools.push(NUMS);
+        if (useSymbols) pools.push(SYMS);
+        if (pools.length === 0) { setPassword(''); return; }
+        const all = pools.join('');
+        const result = [];
+
+        for (let p of pools) if (result.length < length) result.push(p[rand(p.length)]);
+        while (result.length < length) result.push(all[rand(all.length)]);
+
+        for (let i = result.length - 1; i > 0; i--) {
+          const j = rand(i + 1);
+          const tmp = result[i]; result[i] = result[j]; result[j] = tmp;
+        }
+        const pwd = result.join('');
+        setPassword(pwd);
+        try { localStorage.setItem('pg:lastPassword', pwd); } catch(e) {}
+        setCopied(false);
+      }
+
+      function copyToClipboard() {
+        if (!password) return;
+        navigator.clipboard.writeText(password).then(() => {
+          setCopied(true);
+          setTimeout(()=>setCopied(false), 1500);
+        }).catch(()=>{});
+      }
+
+      useEffect(()=>{
+        try {
+          const last = localStorage.getItem('pg:lastPassword');
+          if (last) setPassword(last);
+        } catch(e) {}
+      }, []);
+
+      return (
+        <div>
+          <input type="text" readOnly value={password} placeholder="Нажмите «Генерировать»" />
+          <div className="controls">
+            <button onClick={generate}>Генерировать</button>
+            <button onClick={copyToClipboard}>{copied ? 'Скопировано' : 'Копировать'}</button>
+            <button onClick={()=>{ setPassword(''); localStorage.removeItem('pg:lastPassword'); }}>Очистить</button>
+          </div>
+
+          <div style={{marginBottom:8}}>
+            <label>Длина: {length}</label>
+            <input type="range" min="4" max="64" value={length} onChange={e=>setLength(+e.target.value)} />
+          </div>
+
+          <div>
+            <label><input type="checkbox" checked={useLower} onChange={e=>setUseLower(e.target.checked)} /> строчные</label><br/>
+            <label><input type="checkbox" checked={useUpper} onChange={e=>setUseUpper(e.target.checked)} /> заглавные</label><br/>
+            <label><input type="checkbox" checked={useNumbers} onChange={e=>setUseNumbers(e.target.checked)} /> цифры</label><br/>
+            <label><input type="checkbox" checked={useSymbols} onChange={e=>setUseSymbols(e.target.checked)} /> символы</label>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
